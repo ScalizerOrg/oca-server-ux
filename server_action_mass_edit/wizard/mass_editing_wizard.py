@@ -87,27 +87,28 @@ class MassEditingWizard(models.TransientModel):
         server_action = self.env["ir.actions.server"].sudo().browse(server_action_id)
         if not server_action:
             return super().onchange(values, field_names, fields_spec)
-        dynamic_fields = {}
+        dynamic_field_names = set()
 
         for line in server_action.mapped("mass_edit_line_ids"):
             values["selection__" + line.field_id.name] = "ignore"
             values[line.field_id.name] = False
+            dynamic_field_names.add("selection__" + line.field_id.name)
+            dynamic_field_names.add(line.field_id.name)
 
-            # Make sure there is an entry for the default value retrieved above.
-            dynamic_fields["selection__" + line.field_id.name] = fields.Selection(
-                [("ignore", _("Don't touch"))], default="ignore"
-            )
-            dynamic_fields[line.field_id.name] = fields.Text([()], default=False)
+        known_values = {k: v for k, v in values.items() if k in self._fields}
+        known_field_names = [f for f in field_names if f in self._fields]
+        known_fields_spec = {k: v for k, v in fields_spec.items() if k in self._fields}
 
-        self._fields.update(dynamic_fields)
-
-        res = super().onchange(values, field_names, fields_spec)
+        if first_call or known_field_names:
+            res = super().onchange(known_values, known_field_names, known_fields_spec)
+        else:
+            res = {"value": {}}
         if not res["value"]:
-            value = {key: value for key, value in values.items() if value is not False}
-            res["value"] = value
+            res["value"] = {k: v for k, v in known_values.items() if v is not False}
 
-        for field in dynamic_fields:
-            self._fields.pop(field)
+        for fname in dynamic_field_names:
+            if fname not in res["value"]:
+                res["value"][fname] = values.get(fname, False)
 
         view_temp = (
             self.env["ir.ui.view"]
