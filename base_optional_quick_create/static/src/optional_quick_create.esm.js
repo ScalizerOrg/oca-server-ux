@@ -1,3 +1,5 @@
+/** @odoo-module **/
+
 import {Many2One} from "@web/views/fields/many2one/many2one";
 import {patch} from "@web/core/utils/patch";
 import {session} from "@web/session";
